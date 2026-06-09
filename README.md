@@ -94,11 +94,4 @@ Both repos are set to public. If access fails, contact the team.
 
 ---
 
-## Baselines
 
-This project does not include baseline code directly. The following sources were used for comparison and reference:
-
-- **CLIP (Radford et al., 2021):** https://github.com/openai/CLIP
-- **CIRR / FashionIQ benchmark:** https://github.com/Cuberick-Orion/CIRR
-- **BLIP-based CIR (Li et al.):** https://arxiv.org/abs/2207.01885
-- **Combiner (Baldrati et al., 2022):** https://arxiv.org/abs/2205.13485
