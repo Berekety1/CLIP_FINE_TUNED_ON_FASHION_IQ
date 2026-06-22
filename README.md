@@ -83,15 +83,6 @@ Both repos are set to public. If access fails, contact the team.
 - **Retrieval:** FAISS `IndexFlatIP` over a gallery of ~50+ images (FashionIQ train+val)
 - **Training:** AdamW (lr=5e-5), CosineAnnealingLR, gradient clipping (max_norm=1.0), batch_size=32
 
----
 
-## AI Tools Used
-
-- **Claude (Anthropic):** Used throughout for architecture design discussions, debugging training loop issues, and generating documentation. The combiner architecture and LoRA injection strategy were iterated with Claude's assistance.
-- **ChatGPT:** Used for brainstorming ideas.
-- **Gemnai:** Used to fix some Google colab runtime issue.
-
-
----
 
 
