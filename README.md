@@ -1,88 +1,61 @@
-# README
+# Composed Image Retrieval on FashionIQ with LoRA-tuned CLIP
 
-# Multimodal Composed Image Retrieval on FashionIQ
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Berekety1/CLIP_FINE_TUNED_ON_FASHION_IQ/blob/main/clip_fine_tuned_on_fashioniq.ipynb)
 
-CLIP ViT-B/32 fine-tuned with LoRA + a custom DeepCrossAttentionCombiner for composed image retrieval (CIR) on the FashionIQ dataset. Given a reference garment image and a natural-language modification query, the system retrieves the closest matching target from a FAISS-indexed gallery.
+**Find a garment from a photo plus a description of what to change.** Give the model a reference image and a text such as *"is shorter and has no sleeves"*, and it retrieves the matching item from a gallery of 52,464 fashion images.
 
----
+The model is CLIP ViT-B/32 fine-tuned with **LoRA** (0.65% of parameters trained), plus a custom **cross-attention combiner** that fuses the image and the text into one query vector. That vector is searched with **FAISS**.
 
-## Reproducibility Scope
+## Results
 
-Full training reproduction is **not required** to verify results. Pre-trained weights and a pre-built FAISS index are hosted on Hugging Face and are loaded automatically at runtime. The notebook will skip training and go straight to evaluation and the interactive demo.
+Validation set of [FashionIQ](https://github.com/XiaoxiaoGuo/fashion-iq): 4,574 queries searched against 13,138 candidate images.
 
-> **What you can reproduce:** validation Recall@{1,10,20,50,100} across all three FashionIQ categories (dress, shirt, toptee), plus the Gradio demo interface — all without any local training.
+| Category | Queries | Recall@1 | Recall@10 | Recall@20 | Recall@50 | Recall@100 |
+|---|---:|---:|---:|---:|---:|---:|
+| Dress | 1,845 | 5.96% | 24.50% | 33.12% | 45.91% | 57.07% |
+| Shirt | 1,172 | 7.68% | 24.32% | 32.94% | 48.29% | 59.81% |
+| Top/tee | 1,557 | 9.06% | 28.52% | 37.57% | 52.34% | 63.33% |
+| **All** | **4,574** | **7.46%** | **25.82%** | **34.59%** | **48.71%** | **59.90%** |
 
-If you want to retrain from scratch, set `FORCE_RETRAIN = True` in Cell 3. A GPU runtime is required; full training on the default 10 epochs takes ~1–2 hours on a T4.
+*Recall@K: the share of queries whose correct target image is among the top K results.*
 
----
+## How it works
 
-## Execution Environment
-
-- **Platform:** Google Colab (tested on T4/A100 GPU runtimes)
-- **Python:** 3.10+
-
-Key library versions (installed automatically by Cell 1):
-
-| Library | Version |
-|---|---|
-| `transformers` | 4.41.0 |
-| `peft` | 0.11.1 |
-| `faiss-cpu` | latest |
-| `gradio` | latest |
-| `torch` | Colab default (≥2.0) |
-| `ftfy`, `pillow`, `tqdm` | latest |
-| `huggingface_hub` | latest |
-
----
-
-## How to Run
-
-1. Open `clip_fine_tuned_on_fashioniq_final.ipynb` in Google Colab.
-2. Make sure you have a **GPU runtime** enabled (`Runtime > Change runtime type > T4 GPU`).
-3. Mount Google Drive when prompted (used for checkpoint caching only).
-4. Run all cells top-to-bottom (`Runtime > Run all`).
-
-The notebook will:
-- Install dependencies (Cell 1)
-- Pull the FashionIQ dataset zip from `berekety/fashion-iq-data` on Hugging Face (Cell 3)
-- Load pre-trained LoRA-CLIP weights + combiner from `berekety/fashion-iq-lora-clip` (Cell 6) — **training is skipped**
-- Run Recall@K evaluation across all three categories (Cell 7)
-- Load the pre-built demo FAISS index (Cell 8)
-- Launch a Gradio interface for interactive retrieval (Cell 9)
-
-**Expected output (Cell 7):**
 ```
-📊 CATEGORY-SPECIFIC PERFORMANCE BREAKDOWN:
-🛍️ Category: DRESS (N queries)
-   🎯 Recall@1   : x.xx%
-   🎯 Recall@10  : x.xx%
-   ...
-🌍 GLOBAL PERFORMANCE SUMMARY
+reference image ──► CLIP image encoder (LoRA) ──► image patch tokens ─┐
+                                                                       ├─► cross-attention combiner ──► composed query (512-d)
+modification text ─► CLIP text encoder (LoRA) ──► text tokens ─────────┘                                     │
+                                                                                                              ▼
+gallery images ────► CLIP image encoder (LoRA) ──► image embeddings ──► FAISS index ──► top-K nearest images
 ```
 
-**Expected output (Cell 9):** A Gradio link (public or local) where you can upload a garment image and enter a text modifier to retrieve top-K matches from the gallery.
+- **Backbone:** `openai/clip-vit-base-patch32`, with LoRA adapters (r=8, α=16) on the attention `q_proj`, `k_proj`, `v_proj` and `out_proj` layers. That is 983K trainable parameters out of 152M.
+- **Combiner (`DeepCrossAttentionCombiner`):** the text tokens attend to the reference image's patches. A learned gate then mixes this attended summary with an MLP over the global image and text embeddings, giving a normalised 512-d query.
+- **Training:** contrastive InfoNCE loss (temperature 0.07) between composed queries and target images, AdamW (lr 5e-5), cosine LR schedule, gradient clipping at 1.0, batch size 32, 10 epochs.
+- **Search:** exact inner-product search with FAISS `IndexFlatIP`.
 
----
+## Run it
 
-## Model & Dataset Links
+Click **Open in Colab** above, switch to a GPU runtime (`Runtime → Change runtime type → T4 GPU`), and choose `Runtime → Run all`.
+
+No training is needed. The trained weights and pre-built FAISS indexes are downloaded from Hugging Face, so the notebook goes straight to:
+
+1. installing dependencies (cell 1)
+2. downloading FashionIQ (cell 3)
+3. loading the LoRA-CLIP weights and the combiner (cell 6)
+4. evaluating Recall@K for each category (cell 7)
+5. loading the demo index (cell 8)
+6. launching a **Gradio demo**: upload a garment photo, type a change, and see the top matches (cell 9)
+
+To retrain from scratch, set `FORCE_RETRAIN = True` in cell 3. Training takes about 1–2 hours on a T4.
+
+**Tested with:** Python 3.10+, `transformers` 4.41.0, `peft` 0.11.1, PyTorch ≥ 2.0, plus `faiss-cpu`, `gradio`, `ftfy`, `pillow`, `tqdm` and `huggingface_hub` (all installed by cell 1).
+
+## Model and data
 
 | Resource | Link |
 |---|---|
-| Model weights + FAISS index | https://huggingface.co/berekety/fashion-iq-lora-clip |
-| FashionIQ dataset (zipped) | https://huggingface.co/datasets/berekety/fashion-iq-data |
+| Trained weights and FAISS indexes | [huggingface.co/berekety/fashion-iq-lora-clip](https://huggingface.co/berekety/fashion-iq-lora-clip) |
+| FashionIQ dataset (zipped) | [huggingface.co/datasets/berekety/fashion-iq-data](https://huggingface.co/datasets/berekety/fashion-iq-data) |
 
-Both repos are set to public. If access fails, contact the team.
-
----
-
-## Architecture Overview
-
-- **Backbone:** `openai/clip-vit-base-patch32` with LoRA adapters injected into `q_proj`, `v_proj`, `k_proj`, `out_proj` (r=8, alpha=16)
-- **Combiner:** `DeepCrossAttentionCombiner` — cross-attention between text tokens and reference image patches, gated MLP fusion, outputs a normalized 512-d composed query vector
-- **Loss:** Global InfoNCE (temperature=0.07)
-- **Retrieval:** FAISS `IndexFlatIP` over a gallery of ~50+ images (FashionIQ train+val)
-- **Training:** AdamW (lr=5e-5), CosineAnnealingLR, gradient clipping (max_norm=1.0), batch_size=32
-
-
-
-
+FashionIQ: H. Wu et al., *Fashion IQ: A New Dataset Towards Retrieving Images by Natural Language Feedback*, CVPR 2021.
