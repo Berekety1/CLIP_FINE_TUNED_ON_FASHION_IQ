@@ -2,6 +2,8 @@
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Berekety1/CLIP_FINE_TUNED_ON_FASHION_IQ/blob/main/clip_fine_tuned_on_fashioniq.ipynb)
 
+*Team project for the Computer Vision course at GIST.*
+
 **Find a garment from a photo plus a description of what to change.** Give the model a reference image and a text such as *"is shorter and has no sleeves"*, and it retrieves the matching item from a gallery of 52,464 fashion images.
 
 The model is CLIP ViT-B/32 fine-tuned with **LoRA** (0.65% of parameters trained), plus a custom **cross-attention combiner** that fuses the image and the text into one query vector. That vector is searched with **FAISS**.
